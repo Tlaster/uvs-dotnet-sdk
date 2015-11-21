@@ -16,8 +16,8 @@ namespace QCloud.VideoApi.Common
             }
             var now = DateTime.Now.ToUnixTime() / 1000;
             var rand = new Random();
-            var rdm = rand.Next(Int32.MaxValue);
-            var plainText = "a=" + appId + "&k=" + secretId + "&e=" + expired + "&t=" + now + "&r=" + rdm + "&f=" + fileId + "&b=" + bucketName;
+            var rdm = rand.Next(int.MaxValue);
+            var plainText = $"a={appId}&k={secretId}&e={expired}&t={now}&r={rdm}&f={fileId}&b={bucketName}";
 
             using (HMACSHA1 mac = new HMACSHA1(Encoding.UTF8.GetBytes(secretKey)))
             {

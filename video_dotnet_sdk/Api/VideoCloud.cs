@@ -7,6 +7,7 @@ using System.Web;
 using Newtonsoft.Json.Linq;
 using System.IO;
 using Newtonsoft.Json;
+using System.Threading.Tasks;
 
 namespace QCloud.VideoApi.Api
 {
@@ -88,10 +89,10 @@ namespace QCloud.VideoApi.Api
         /// <param name="remotePath">远程文件夹路径</param>
         /// <param name="bizAttribute">更新信息</param>
         /// <returns></returns>
-        public string UpdateFolder(string bucketName, string remotePath, string bizAttribute)
+        public async Task<string> UpdateFolder(string bucketName, string remotePath, string bizAttribute)
         {
             remotePath = StandardizationRemotePath(remotePath);
-            return UpdateFile(bucketName, remotePath, bizAttribute, null, null);
+            return await UpdateFile(bucketName, remotePath, bizAttribute, null, null);
         }
 
         /// <summary>
@@ -103,7 +104,7 @@ namespace QCloud.VideoApi.Api
         /// <param name="title">标题</param>
         /// <param name="desc">描述</param>
         /// <returns></returns>
-        public string UpdateFile(string bucketName, string remotePath, string bizAttribute, string videoCover = null, string title = null, string desc = null)
+        public async Task<string> UpdateFile(string bucketName, string remotePath, string bizAttribute, string videoCover = null, string title = null, string desc = null)
         {
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath);
             int flag = 0;
@@ -133,15 +134,15 @@ namespace QCloud.VideoApi.Api
             var data = new Dictionary<string, string>();
             data.Add("op", "update");
             data.Add("biz_attr", bizAttribute);
-            if (videoCover != null) 
+            if (videoCover != null)
             {
                 data.Add("video_cover", videoCover);
-            }            
-            if (title != null) 
+            }
+            if (title != null)
             {
                 data.Add("video_title", title);
             }
-            if (desc != null) 
+            if (desc != null)
             {
                 data.Add("video_desc", desc);
             }
@@ -151,7 +152,7 @@ namespace QCloud.VideoApi.Api
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
             header.Add("Content-Type", "application/json");
-            return Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
+            return await Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
         }
 
         /// <summary>
@@ -160,10 +161,10 @@ namespace QCloud.VideoApi.Api
         /// <param name="bucketName">bucket名称</param>
         /// <param name="remotePath">远程文件夹路径</param>
         /// <returns></returns>
-        public string DeleteFolder(string bucketName, string remotePath)
+        public async Task<string> DeleteFolder(string bucketName, string remotePath)
         {
             remotePath = StandardizationRemotePath(remotePath);
-            return DeleteFile(bucketName, remotePath);
+            return await DeleteFile(bucketName, remotePath);
         }
 
         /// <summary>
@@ -172,7 +173,7 @@ namespace QCloud.VideoApi.Api
         /// <param name="bucketName">bucket名称</param>
         /// <param name="remotePath">远程文件路径</param>
         /// <returns></returns>
-        public string DeleteFile(string bucketName, string remotePath)
+        public async Task<string> DeleteFile(string bucketName, string remotePath)
         {
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath);
             var data = new Dictionary<string, string>();
@@ -181,7 +182,7 @@ namespace QCloud.VideoApi.Api
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
             header.Add("Content-Type", "application/json");
-            return Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
+            return await Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
         }
 
         /// <summary>
@@ -190,10 +191,10 @@ namespace QCloud.VideoApi.Api
         /// <param name="bucketName">bucket名称</param>
         /// <param name="remotePath">远程文件夹路径</param>
         /// <returns></returns>
-        public string GetFolderStat(string bucketName, string remotePath)
+        public async Task<string> GetFolderStat(string bucketName, string remotePath)
         {
             remotePath = StandardizationRemotePath(remotePath);
-            return GetFileStat(bucketName, remotePath);
+            return await GetFileStat(bucketName, remotePath);
         }
 
         /// <summary>
@@ -202,7 +203,7 @@ namespace QCloud.VideoApi.Api
         /// <param name="bucketName">bucket名称</param>
         /// <param name="remotePath">远程文件路径</param>
         /// <returns></returns>
-        public string GetFileStat(string bucketName, string remotePath)
+        public async Task<string> GetFileStat(string bucketName, string remotePath)
         {
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath);
             var data = new Dictionary<string, string>();
@@ -211,7 +212,7 @@ namespace QCloud.VideoApi.Api
             var sign = Sign.Signature(appId, secretId, secretKey, expired, bucketName);
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
-            return Request.SendRequest(url, data, HttpMethod.Get, header, timeOut);
+            return await Request.SendRequest(url, data, HttpMethod.Get, header, timeOut);
         }
 
         /// <summary>
@@ -221,7 +222,7 @@ namespace QCloud.VideoApi.Api
         /// <param name="remotePath">远程文件夹路径</param>
         /// <param name="bizAttribute">附加信息</param>
         /// <returns></returns>
-        public string CreateFolder(string bucketName, string remotePath, string bizAttribute = "")
+        public async Task<string> CreateFolder(string bucketName, string remotePath, string bizAttribute = "")
         {
             remotePath = StandardizationRemotePath(remotePath);
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath);
@@ -233,7 +234,7 @@ namespace QCloud.VideoApi.Api
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
             header.Add("Content-Type", "application/json");
-            return Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
+            return await Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
         }
 
         /// <summary>
@@ -247,7 +248,7 @@ namespace QCloud.VideoApi.Api
         /// <param name="pattern">拉取模式:只是文件，只是文件夹，全部</param>
         /// <param name="prefix">读取文件/文件夹前缀</param>
         /// <returns></returns>
-        public string GetFolderList(string bucketName, string remotePath, int num, string context, int order, FolderPattern pattern, string prefix = "")
+        public async Task<string> GetFolderList(string bucketName, string remotePath, int num, string context, int order, FolderPattern pattern, string prefix = "")
         {
             remotePath = StandardizationRemotePath(remotePath);
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath) + HttpUtility.UrlEncode(prefix);
@@ -262,7 +263,7 @@ namespace QCloud.VideoApi.Api
             var sign = Sign.Signature(appId, secretId, secretKey, expired, bucketName);
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
-            return Request.SendRequest(url, data, HttpMethod.Get, header, timeOut);
+            return await Request.SendRequest(url, data, HttpMethod.Get, header, timeOut);
         }
 
         /// <summary>
@@ -276,7 +277,7 @@ namespace QCloud.VideoApi.Api
         /// <param name="desc">描述</param>
         /// <param name="magicContext">透传字段，业务设置回调url的话，会把这个字段通过回调url传给业务</param>
         /// <returns></returns>
-        public string UploadFile(string bucketName, string remotePath, string localPath, string videoCover, string bizAttribute = "", string title = "", string desc = "", string magicContext = "")
+        public async Task<string> UploadFile(string bucketName, string remotePath, string localPath, string videoCover, string bizAttribute = "", string title = "", string desc = "", string magicContext = "")
         {
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath);
             var sha1 = SHA1.GetSHA1(localPath);
@@ -292,7 +293,7 @@ namespace QCloud.VideoApi.Api
             var sign = Sign.Signature(appId, secretId, secretKey, expired, bucketName);
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
-            return Request.SendRequest(url, data, HttpMethod.Post, header, timeOut, localPath);
+            return await Request.SendRequest(url, data, HttpMethod.Post, header, timeOut, localPath);
         }
 
         /// <summary>
@@ -307,7 +308,7 @@ namespace QCloud.VideoApi.Api
         /// <param name="magicContext">透传字段，业务设置回调url的话，会把这个字段通过回调url传给业务</param>
         /// <param name="sliceSize">切片大小（字节）</param>
         /// <returns></returns>
-        public string SliceUploadFirstStep(string bucketName, string remotePath, string localPath, string videoCover, string bizAttribute, string title, 
+        public async Task<string> SliceUploadFirstStep(string bucketName, string remotePath, string localPath, string videoCover, string bizAttribute, string title,
             string desc, string magicContext, int sliceSize)
         {
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath);
@@ -327,7 +328,7 @@ namespace QCloud.VideoApi.Api
             var sign = Sign.Signature(appId, secretId, secretKey, expired, bucketName);
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
-            return Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
+            return await Request.SendRequest(url, data, HttpMethod.Post, header, timeOut);
         }
 
         /// <summary>
@@ -340,19 +341,19 @@ namespace QCloud.VideoApi.Api
         /// <param name="offset">文件分片偏移量</param>
         /// <param name="sliceSize">切片大小（字节）</param>
         /// <returns></returns>
-        public string SliceUploadFollowStep(string bucketName, string remotePath, string localPath,
+        public async Task<string> SliceUploadFollowStep(string bucketName, string remotePath, string localPath,
                 string sessionId, int offset, int sliceSize)
         {
             var url = VIDEOAPI_CGI_URL + appId + "/" + bucketName + EncodeRemotePath(remotePath);
             var data = new Dictionary<string, string>();
             data.Add("op", "upload_slice");
             data.Add("session", sessionId);
-            data.Add("offset", offset.ToString()); 
+            data.Add("offset", offset.ToString());
             var expired = DateTime.Now.ToUnixTime() / 1000 + 60;
             var sign = Sign.Signature(appId, secretId, secretKey, expired, bucketName);
             var header = new Dictionary<string, string>();
             header.Add("Authorization", sign);
-            return Request.SendRequest(url, data, HttpMethod.Post, header, timeOut, localPath, offset, sliceSize);
+            return await Request.SendRequest(url, data, HttpMethod.Post, header, timeOut, localPath, offset, sliceSize);
         }
 
         /// <summary>
@@ -367,10 +368,10 @@ namespace QCloud.VideoApi.Api
         /// <param name="magicContext">透传字段，业务设置回调url的话，会把这个字段通过回调url传给业务</param>
         /// <param name="sliceSize">切片大小（字节）</param>
         /// <returns></returns>
-        public string SliceUploadFile(string bucketName, string remotePath, string localPath, string videoCover = "", string bizAttribute = "", 
+        public async Task<string> SliceUploadFile(string bucketName, string remotePath, string localPath, string videoCover = "", string bizAttribute = "",
             string title = "", string desc = "", string magicContext = "", int sliceSize = 512 * 1024)
         {
-            var result = SliceUploadFirstStep(bucketName, remotePath, localPath, videoCover, bizAttribute, title, desc, magicContext, sliceSize);
+            var result = await SliceUploadFirstStep(bucketName, remotePath, localPath, videoCover, bizAttribute, title, desc, magicContext, sliceSize);
             var obj = (JObject)JsonConvert.DeserializeObject(result);
             var code = (int)obj["code"];
             if (code != 0)
@@ -392,7 +393,7 @@ namespace QCloud.VideoApi.Api
                 var retryCount = 0;
                 while (true)
                 {
-                    result = SliceUploadFollowStep(bucketName, remotePath, localPath, sessionId, offset, sliceSize);
+                    result = await SliceUploadFollowStep(bucketName, remotePath, localPath, sessionId, offset, sliceSize);
                     Console.WriteLine(result);
                     obj = (JObject)JsonConvert.DeserializeObject(result);
                     code = (int)obj["code"];

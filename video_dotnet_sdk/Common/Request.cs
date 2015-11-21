@@ -6,6 +6,7 @@ using System.IO;
 using System.Net.Security;
 using System.Web;
 using Newtonsoft.Json;
+using System.Threading.Tasks;
 
 namespace QCloud.VideoApi.Common
 {
@@ -15,24 +16,24 @@ namespace QCloud.VideoApi.Common
     /// </summary>
     class Request
     {
-        public static string SendRequest(string url, Dictionary<string, string> data, HttpMethod requestMethod,
+        public static async Task<string> SendRequest(string url, Dictionary<string, string> data, HttpMethod requestMethod,
             Dictionary<string, string> header, int timeOut, string localPath = null, int offset = -1, int sliceSize = 0)
         {
             try
             {
-                System.Net.ServicePointManager.Expect100Continue = false;
+                ServicePointManager.Expect100Continue = false;
                 if (requestMethod == HttpMethod.Get)
                 {
                     var paramStr = "";
                     foreach (var key in data.Keys)
                     {
-                        paramStr += string.Format("{0}={1}&", key, HttpUtility.UrlEncode(data[key].ToString()));
+                        paramStr += $"{key}={HttpUtility.UrlEncode(data[key].ToString())}&";
                     }
                     paramStr = paramStr.TrimEnd('&');
                     url += (url.EndsWith("?") ? "&" : "?") + paramStr;
                 }
 
-                var request = (HttpWebRequest)HttpWebRequest.Create(url);
+                HttpWebRequest request = WebRequest.CreateHttp(url);
                 request.Accept = "*/*";
                 request.KeepAlive = true;
                 request.UserAgent = "qcloud-dotnet-sdk";
@@ -51,78 +52,80 @@ namespace QCloud.VideoApi.Common
                 if (requestMethod == HttpMethod.Post)
                 {
                     request.Method = requestMethod.ToString().ToUpper();
-                    var memStream = new MemoryStream();
-                    if (header.ContainsKey("Content-Type") && header["Content-Type"] == "application/json")
+                    using (var memStream = new MemoryStream())
                     {
-                        var json = JsonConvert.SerializeObject(data);
-                        var jsonByte = Encoding.GetEncoding("utf-8").GetBytes(json.ToString());
-                        memStream.Write(jsonByte, 0, jsonByte.Length);
-                    }
-                    else
-                    {
-                        var boundary = "---------------" + DateTime.Now.Ticks.ToString("x");
-                        var beginBoundary = Encoding.ASCII.GetBytes("\r\n--" + boundary + "\r\n");
-                        var endBoundary = Encoding.ASCII.GetBytes("\r\n--" + boundary + "--\r\n");
-                        request.ContentType = "multipart/form-data; boundary=" + boundary;
-
-                        var strBuf = new StringBuilder();
-                        foreach (var key in data.Keys)
+                        if (header.ContainsKey("Content-Type") && header["Content-Type"] == "application/json")
                         {
-                            strBuf.Append("\r\n--" + boundary + "\r\n");
-                            strBuf.Append("Content-Disposition: form-data; name=\"" + key + "\"\r\n\r\n");
-                            strBuf.Append(data[key].ToString());
+                            var json = JsonConvert.SerializeObject(data);
+                            var jsonByte = Encoding.GetEncoding("utf-8").GetBytes(json.ToString());
+                            await memStream.WriteAsync(jsonByte, 0, jsonByte.Length);
                         }
-                        var paramsByte = Encoding.GetEncoding("utf-8").GetBytes(strBuf.ToString());
-                        memStream.Write(paramsByte, 0, paramsByte.Length);
-
-                        if (localPath != null)
+                        else
                         {
-                            memStream.Write(beginBoundary, 0, beginBoundary.Length);
-                            var fileInfo = new FileInfo(localPath);
-                            var fileStream = new FileStream(localPath, FileMode.Open, FileAccess.Read);
+                            var boundary = $"---------------{DateTime.Now.Ticks.ToString("x")}";
+                            var beginBoundary = Encoding.ASCII.GetBytes($"\r\n--{boundary}\r\n");
+                            var endBoundary = Encoding.ASCII.GetBytes($"\r\n--{boundary}--\r\n");
+                            request.ContentType = $"multipart/form-data; boundary={boundary}";
 
-                            const string filePartHeader =
-                                "Content-Disposition: form-data; name=\"fileContent\"; filename=\"{0}\"\r\n" +
-                                "Content-Type: application/octet-stream\r\n\r\n";
-                            var headerText = string.Format(filePartHeader, fileInfo.Name);
-                            var headerbytes = Encoding.UTF8.GetBytes(headerText);
-                            memStream.Write(headerbytes, 0, headerbytes.Length);
-
-                            if (offset == -1)
+                            var strBuf = new StringBuilder();
+                            foreach (var key in data.Keys)
                             {
-                                var buffer = new byte[1024];
-                                int bytesRead;
-                                while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) != 0)
+                                strBuf.Append($"\r\n--{boundary}\r\n");
+                                strBuf.Append($"Content-Disposition: form-data; name=\"{key}\"\r\n\r\n");
+                                strBuf.Append(data[key].ToString());
+                            }
+                            var paramsByte = Encoding.GetEncoding("utf-8").GetBytes(strBuf.ToString());
+                            await memStream.WriteAsync(paramsByte, 0, paramsByte.Length);
+
+                            if (localPath != null)
+                            {
+                                await memStream.WriteAsync(beginBoundary, 0, beginBoundary.Length);
+                                var fileInfo = new FileInfo(localPath);
+                                using (var fileStream = new FileStream(localPath, FileMode.Open, FileAccess.Read))
                                 {
-                                    memStream.Write(buffer, 0, bytesRead);
+                                    const string filePartHeader =
+                                        "Content-Disposition: form-data; name=\"fileContent\"; filename=\"{0}\"\r\n" +
+                                        "Content-Type: application/octet-stream\r\n\r\n";
+                                    var headerText = string.Format(filePartHeader, fileInfo.Name);
+                                    var headerbytes = Encoding.UTF8.GetBytes(headerText);
+                                    await memStream.WriteAsync(headerbytes, 0, headerbytes.Length);
+
+                                    if (offset == -1)
+                                    {
+                                        var buffer = new byte[1024];
+                                        int bytesRead;
+                                        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) != 0)
+                                        {
+                                            await memStream.WriteAsync(buffer, 0, bytesRead);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        var buffer = new byte[sliceSize];
+                                        int bytesRead;
+                                        fileStream.Seek(offset, SeekOrigin.Begin);
+                                        bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length);
+                                        await memStream.WriteAsync(buffer, 0, bytesRead);
+                                    }
                                 }
                             }
-                            else
-                            {
-                                var buffer = new byte[sliceSize];
-                                int bytesRead;
-                                fileStream.Seek(offset, SeekOrigin.Begin);
-                                bytesRead = fileStream.Read(buffer, 0, buffer.Length);
-                                memStream.Write(buffer, 0, bytesRead);
-                            }
+                            await memStream.WriteAsync(endBoundary, 0, endBoundary.Length);
                         }
-                        memStream.Write(endBoundary, 0, endBoundary.Length);
+                        request.ContentLength = memStream.Length;
+                        using (var requestStream = request.GetRequestStream())
+                        {
+                            memStream.Position = 0;
+                            await memStream.CopyToAsync(requestStream);
+                        }
                     }
-                    request.ContentLength = memStream.Length;
-                    var requestStream = request.GetRequestStream();
-                    memStream.Position = 0;
-                    var tempBuffer = new byte[memStream.Length];
-                    memStream.Read(tempBuffer, 0, tempBuffer.Length);
-                    memStream.Close();
-
-                    requestStream.Write(tempBuffer, 0, tempBuffer.Length);
-                    requestStream.Close();
                 }
                 var response = request.GetResponse();
                 using (var s = response.GetResponseStream())
                 {
-                    var reader = new StreamReader(s, Encoding.UTF8);
-                    return reader.ReadToEnd();
+                    using (var reader = new StreamReader(s, Encoding.UTF8))
+                    {
+                        return await reader.ReadToEndAsync();
+                    }
                 }
             }
             catch (WebException we)
@@ -132,7 +135,7 @@ namespace QCloud.VideoApi.Common
                     using (var s = we.Response.GetResponseStream())
                     {
                         var reader = new StreamReader(s, Encoding.UTF8);
-                        return reader.ReadToEnd();
+                        return await reader.ReadToEndAsync();
                     }
                 }
                 else
